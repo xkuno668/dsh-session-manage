@@ -1,0 +1,37 @@
+{
+  "name": "dsh-session-manage",
+  "version": "0.3.9",
+  "description": "Auditable, recoverable session and upload-file management for DeepSeek Harness.",
+  "type": "module",
+  "main": "./lib/index.js",
+  "bin": {
+    "dsh-session-manage": "./bin/dsh-session-manager.js"
+  },
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": ["lib", "bin", "cordis.patch.yml", "README.md"],
+  "engines": { "node": ">=22.15.0" },
+  "dsh": {
+    "bundle": { "patch": "./cordis.patch.yml" },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-settings"
+      ],
+      "platform": "web"
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "~4.0.5",
+    "@deepseek-ai/dsh-host-webserver": ">=0.2.1-rc.1 <0.2.2-0",
+    "react": "^18.2.0"
+  },
+  "scripts": {
+    "check": "node --check lib/index.js && node --check lib/client.js && node --check bin/dsh-session-manager.js",
+    "test": "node --test test/*.test.js"
+  }
+}

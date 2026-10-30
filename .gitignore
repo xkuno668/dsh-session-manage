@@ -1,0 +1,15 @@
+# Dependencies and local package-manager cache
+node_modules/
+.npm-cache/
+
+# Local package artifacts: upload the selected current package to GitHub Release instead
+*.tgz
+
+# Local scratch files and temporary proxy helper
+tools/temporary-*.cjs
+
+# Logs and OS/editor files
+*.log
+.DS_Store
+Thumbs.db
+.vscode/
