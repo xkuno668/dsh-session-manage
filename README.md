@@ -2,16 +2,16 @@
 
 # dsh-session-manage
 
-**DSH Desktop 的会话、文件与上下文管理插件**
+**DSH（DeepSeek Harness）的会话、产物文件与回收区管理插件**
 
-在 DSH 设置左侧栏集中查看主会话、会话关联文件、Skill / MCP 使用记录，并以「可审计、可恢复」的方式处理会话及其产物文件。
+在「设置 → 会话管理」里按会话查看日志、关联文件与 Skill / MCP 使用记录，并把处置动作收敛成「移入回收区 + 写审计 + 可恢复」。
 
 ![version](https://img.shields.io/badge/version-0.5.4-4f46e5)
 ![node](https://img.shields.io/badge/node-%3E%3D22.15-339933)
 ![platform](https://img.shields.io/badge/platform-DSH%20Desktop%20%C2%B7%20Web-0ea5e9)
 ![license](https://img.shields.io/badge/license-MIT-111827)
 
-本地运行 · 不调用模型 · 不消耗 token · 删除即移入回收区
+本地运行 · 不调用模型 · 不消耗 token · 删除即可恢复
 
 </div>
 
@@ -23,7 +23,7 @@
 - [功能](#功能)
 - [安装](#安装)
 - [使用](#使用)
-- [删除语义与安全边界](#删除语义与安全边界)
+- [删除、恢复与安全边界](#删除恢复与安全边界)
 - [配置](#配置)
 - [HTTP API](#http-api)
 - [磁盘布局](#磁盘布局)
@@ -38,31 +38,37 @@
 
 DSH 把每个会话写成 `<DSH_HOME>/sessions/<workspace>/<session-id>/session.v*.jsonl.zstd`，并在
 `<DSH_HOME>/storages/session_projcache/sessions/<session-id>.json` 里维护侧边栏标题等投影数据。
-这些文件只增不减：会话日志、被会话读过或写过的产物文件、回收区里的历史条目都会一直留在磁盘上。
+这些文件只增不减：会话日志、被会话读过或写过的产物、历史上的删除记录都会一直留在磁盘上，而 DSH 本身不提供
+「这个会话动了哪些文件」的视图。
 
-DSH 本身不提供「这个会话动了哪些文件」的视图。`dsh-session-manage` 补上这一层：
+`dsh-session-manage` 补上这一层：
 
-- 以**会话**为单位而不是以**目录**为单位回答「谁产生了这些文件」；
-- 处置动作统一走「移入 DSH 回收区 + 写审计」，而不是不可逆的擦除；
-- 所有扫描都在本机完成，插件不读取提示词、不调用模型。
+- 以**会话**而不是**目录**为单位回答「谁产生了这些文件」；
+- 处置动作统一走「移入 DSH 回收区 + 写审计 + 可恢复」，而不是不可逆的擦除；
+- 会话树（主会话 + 子会话 + 仅存在于投影中的委派会话）作为一个整体处理，不会只删掉一半；
+- 全部在本机完成：插件不读取提示词、不调用模型。
 
 ## 功能
 
 | 能力 | 说明 |
 | --- | --- |
-| 主会话列表 | 会话 ID、侧边栏同源标题、工作区、创建时间、日志路径与体积、绑定的子会话数量。被 `parentSession` / `origin: "subagent"` 标记的委派会话不单独占行，其计数归到主会话。 |
-| 延迟扫描 | 列表只解码日志头部与标题投影；文件与上下文扫描仅在你点开某一行会话时进行，避免一进设置页就扫全部工作区。 |
-| 搜索 | 按会话 ID、标题、工作区、日志路径即时过滤。 |
-| 收藏 | 会话可标记收藏（★ 已收藏），状态持久化到本地索引。 |
-| 文件树 | 递归展示会话边界内发现的文件与目录，可展开/收起，工作区根目录本身绝不显示为条目。每行给出「作用」「来源」「状态 / 体积」。 |
-| 文件处置 | 复选框多选、全选、右键菜单：在资源管理器中定位、复制完整路径、移入回收区。目录按整棵子树处理，父子同时选中时自动去重。 |
-| 会话删除 | 连带其子会话、以及只存在于投影中的子代理会话；日志目录与扫描到的现存文件一并移入回收区，并归档侧边栏引用。 |
-| Skill / MCP 记录 | 插件运行期间从会话事件里持续记录用到的 Skill、MCP 服务、工具详情与调用次数。 |
-| 回收与审计 | 每次移动写入 `audit.jsonl`；回收区可按时间目录人工还原，也可一键在资源管理器中打开。 |
-| 清单导出 | 把当前可见会话列表导出为 JSON，便于归档或对外说明。 |
+| 主会话列表 | 会话 ID、与侧边栏同源的标题、工作区、创建时间、日志路径与体积、绑定的子会话数量。被标记为委派会话（`parentSession` / `origin: "subagent"`）的行不单独占位，计数归入主会话。 |
+| 延迟扫描 | 列表只解码日志头部与标题投影；文件与上下文扫描只在你点开某一行为止，避免一进设置页就扫全部工作区。 |
+| 搜索与排序 | 按会话 ID、标题、工作区、日志路径即时过滤；按创建时间倒序。 |
+| 收藏 | ★ 收藏会话，状态持久化到本地索引，可切换到「仅看收藏」。 |
+| 归入工作区 | 把会话归入某个当前已打开的 DSH 工作区，或改为「未分组」；会话会从原工作区移出。 |
+| 文件树 | 递归展示会话边界内的文件与目录（可展开/收起），工作区根目录本身绝不作为条目出现；每行给出「作用」「来源」「状态 / 体积」。 |
+| 文件处置 | 复选框多选、全选可处理项、右键菜单：在资源管理器中定位、复制完整路径、移入回收区。目录按整棵子树处理，父子同时选中时自动去重。 |
+| 停止会话 | 对运行中的主会话（含其子会话）发出停止请求，先停止再处置，避免删掉正在写的日志。 |
+| 会话删除 | 连带子会话与「仅存在于投影中的委派会话」；日志目录与扫描到的现存文件一并移入回收区，并归档侧边栏引用。 |
+| 回收区视图 | 会话为根节点、文件/目录为子树的可视化回收区；支持恢复原位置、恢复会话、永久删除（单条 / 批量）、在资源管理器中定位、复制路径。 |
+| 重启提示 | 恢复会话或删除会话后提示「现在重启 DSH」，由插件调用 Desktop 重启；否则侧边栏索引与磁盘状态不一致。 |
+| Skill / MCP 记录 | 插件运行期间从会话事件中持续采集用到的 Skill、MCP 服务、工具详情与调用次数，并持久化。 |
+| 审计 | 每次移动 / 恢复 / 永久删除都追加一行到 `audit.jsonl`，回收区视图本身就是从审计记录重建的。 |
+| 清单导出 | 把当前过滤后的会话列表导出为 JSON，便于归档或对外说明。 |
 | 零模型开销 | 只读本机元数据与文件系统。 |
 
-界面语言为简体中文；设置项注册在 `settings.section`，与 DSH 其他一级设置入口并列。
+界面语言为简体中文；设置入口注册在 `settings.section`，与 DSH 其他一级设置项并列。
 
 ## 安装
 
@@ -73,12 +79,12 @@ DSH 本身不提供「这个会话动了哪些文件」的视图。`dsh-session-
 | DSH Host WebServer | `>= 0.2.1-rc.1 < 0.2.2-0` |
 | DSH Cordis | `~4.0.5` |
 | React（客户端运行时） | `^18.2.0` |
-| Node.js（仅本地开发 / 打包需要） | `>= 22.15.0` |
-| 平台 | DSH Desktop / Web；「在资源管理器中打开」仅 Windows |
+| Node.js（仅开发 / 打包需要） | `>= 22.15.0` |
+| 平台 | DSH Desktop 或 Web；「在资源管理器中定位 / 打开」仅 Windows Desktop |
 
-### 方式一：安装 GitHub Release 里的插件包
+### 方式一：安装 Release 里的插件包
 
-从 [Releases](https://github.com/xkuno668/dsh-session-manage/releases) 下载当前版本的
+从 [Releases](https://github.com/xkuno668/dsh-session-manage/releases) 下载
 `dsh-session-manage-<version>.tgz`，然后：
 
 ```bash
@@ -98,65 +104,84 @@ npm pack         # 生成 dsh-session-manage-<version>.tgz
 dsh plugin --profile desktop add file:./dsh-session-manage-0.5.4.tgz
 ```
 
-安装完成后**完全退出并重新启动 DSH**（宿主插件与客户端 bundle 都在启动期装载），再打开
-`设置 → 会话管理`。
-
-> Profile 名称按你实际使用的环境替换，例如 `desktop` / `web`。
+安装完成后**完全退出并重启 DSH**（宿主插件与客户端 bundle 都在启动期装载），再打开
+`设置 → 会话管理`。Profile 名按实际环境替换，例如 `desktop` / `web`。
 
 ## 使用
 
 ### 会话列表
 
-1. 打开 **设置 → 会话管理**。
-2. 顶部搜索框过滤；`↻ 刷新` 重新读取；`打开回收区` 直接定位到回收目录；`导出 JSON` 导出当前过滤结果。
-3. 单击会话行进入详情；右键可「打开会话」或「收藏 / 取消收藏」。
+顶部工具条：搜索框、`↻ 刷新`、`♻ 回收区`、`★ 收藏`、`导出 JSON (n)`。单击会话行进入详情；
+右键菜单提供 `打开会话`、`归入工作区`、`收藏 / 取消收藏`。
 
 ### 会话详情
 
-1. 头部给出 Session ID、标题、工作区、创建时间、绑定子会话数、日志路径。
+1. 头部信息：Session ID、标题、工作区、创建时间、绑定子会话数、日志路径与体积。
 2. `Skill / MCP 使用记录`：类型、名称、工具 / 详情、调用次数。
-3. `会话文件`：树状列表，点击目录名展开或收起；右键可定位、复制路径、移入回收区。
-4. 勾选后点 `处理选中项目 (n)`：现存条目移入回收区，不存在的历史条目仅从本插件视图隐藏（不改写 DSH 原始日志）。
-5. `删除会话` 会先弹确认框，说明将连同子会话与扫描到的现存文件一起移入回收区。
+3. `会话文件`：树状列表。勾选框决定处置范围；右键可定位、复制完整路径、移入回收区。
+4. `处理选中项目 (n)`：现存的条目移入回收区；状态为「不存在」的历史条目只从本插件视图隐藏，不改写 DSH 原始日志。
+5. `■ 停止会话`：对运行中的会话树发出停止请求；`删除会话`：弹确认框，说明将连同子会话与现存文件一起移入回收区。
 
-## 删除语义与安全边界
+### 回收区
+
+两种视图可切换：**会话树**（按会话分组，根节点可整体恢复 / 永久删除，子节点是移入回收区的文件与目录）与
+**列表**（时间、类型、原路径、关联会话）。都支持 `全选`、`恢复`、`⌫ 永久删除`（批量），
+右键菜单提供 `打开回收位置`、`复制原始路径`、`复制回收位置`。
+
+恢复会话后插件会调用 DSH 的 `workspaceRegistry.unarchiveSession()` 并刷新会话索引，然后提示重启；
+重启后会话回到侧边栏的「未分组」，由你决定归入哪个工作区。
+
+## 删除、恢复与安全边界
 
 > [!IMPORTANT]
-> 「删除」= 移动到 DSH 专用回收区，不是物理擦除。回收区与源文件应在**同一磁盘卷**上（移动使用同卷原子 `rename`）。
+> 本插件的「删除」= 移动到 DSH 专用回收区，不是物理擦除。只有回收区里的「永久删除」是不可撤销的。
 
 ### 证据等级
 
-插件把每个条目标记为四种来源，等级越高，说明「由本会话产生」的证据越强：
+每个条目标记一种来源，等级越高，「由本会话产生」的证据越强：
 
 | `source` | 含义 | `deletable` |
 | --- | --- | --- |
-| `session-context` | 运行期事件里出现路径字段，且该事件是写 / 创建类动作，文件创建时间晚于会话创建时间 | ✅ |
+| `session-context` | 运行期事件里出现路径字段，且事件是写 / 创建类动作，文件创建时间晚于会话创建时间 | ✅ |
 | `dsh-upload` | 位于 `<cwd>/.dsh-uploads` 的 DSH 上传附件 | ✅ |
-| `session-projection-created` | 持久化投影（`turnOutline`）里出现绝对路径且带创建声明，文件创建时间晚于会话创建时间 | ✅ |
+| `session-projection-created` | 持久化投影（`turnOutline`）中出现绝对路径且带创建声明，文件创建时间晚于会话创建时间 | ✅ |
 | `session-projection` / `workspace-reference` / `session-tree` | 仅被会话读到 / 提到，或在会话边界内被扫到 | ❌ |
 
-`deletable` 目前用于计数与展示；勾选范围以「本会话扫描到的现存条目」为准（见[已知限制](#已知限制)）。
+`deletable` 用于计数与展示；实际可处置范围是「本会话扫描到的现存条目」（见[已知限制](#已知限制)），
+处置前请按「来源」「作用」列人工确认。
 
-### 受保护对象（任何情况下都拒绝处置）
+### 受保护对象
 
 - 会话的工作区根目录本身；
 - `<DSH_HOME>` 内的任意路径（DSH 运行时数据）；
-- 其他**正在运行**的会话所用工作区内的路径；
-- 运行中的会话，其文件与会话本身都不可删除（先停止会话再刷新）。
+- 位于 `sessionsRoot` 之外的会话日志目录；
+- 运行中的会话：其文件不可删除，会话树也不可删除 / 需先 `停止会话`；
+- 回收区之外任意路径的恢复 / 永久删除请求（只接受 `audit.jsonl` 记录的路径）。
+
+### 移动语义
+
+- 同卷：原子 `rename` 到回收区；
+- 跨卷（Windows 不同盘符会返回 `EXDEV`）：先递归 `cp` 到回收区（`errorOnExist`、保留时间戳），成功后再删除源；
+  复制失败则源文件保持原样；
+- 回收区内目标名带内容无关的路径哈希（`<name>-<sha256:12>`），同名文件不会互相覆盖；
+- 恢复时若原路径已被占用，恢复被拒绝，绝不覆盖。
 
 ### 审计
 
-每次处置追加一行到 `<trash>/audit.jsonl`：
+每次处置 / 恢复 / 永久删除追加一行到 `<trash>/audit.jsonl`：
 
 ```json
 {"at":"2026-10-31T03:12:44.918Z","action":"session-tree-trash","sessionId":"session-…","childSessionCount":2,"projectionSessionCount":1,"files":[{"path":"<WORKSPACE>\\out\\report.md","sessionId":"session-…","kind":"file","destination":"…"}],"sessions":[{"sessionId":"session-…","source":"…","destination":"…"}]}
 ```
 
-`action` 取值：`session-tree-trash`、`files-trash-or-hide`。
+`action` 取值：`session-tree-trash`、`files-trash-or-hide`、`session-stop-requested`、
+`session-workspace-assigned`、`session-workspace-unassigned`、`trash-restore`、
+`trash-permanent-delete`、`trash-permanent-delete-batch`。
+回收区视图由该文件重建，删掉它等于放弃可视化管理入口（磁盘内容仍在）。
 
 ## 配置
 
-配置通过 `cordis.patch.yml` 注入，默认值从 `DSH_HOME`（或 `~/.dsh`）推导：
+配置通过 `cordis.patch.yml` 注入，默认值从 `DSH_HOME`（否则 `~/.dsh`）推导：
 
 | 键 | 默认值 | 说明 |
 | --- | --- | --- |
@@ -180,25 +205,32 @@ dsh plugin --profile desktop add file:./dsh-session-manage-0.5.4.tgz
 
 ## HTTP API
 
-服务由 DSH 自身的 loopback WebServer 承载，前缀 `/api/dsh-session-manage`（不额外开监听端口）。
-请求体上限 512 KiB，仅接受 JSON；响应 `cache-control: no-store`。
+服务挂载在 DSH 自身的 loopback WebServer 上，前缀 `/api/dsh-session-manage`（不额外开监听端口）。
+请求体上限 512 KiB；业务校验失败统一 `400 {"error":"…"}`，未知路径 `404`；响应 `cache-control: no-store`。
+所有破坏性操作都要求 `confirm` 字段与动作串**完全相等**。
 
 | 方法 | 路径 | 请求体 / 查询 | 说明 |
 | --- | --- | --- | --- |
 | `GET` | `/sessions` | — | 会话元数据列表（含 `pinned`），不扫描文件。 |
-| `GET` | `/session` | `?sessionId=` | 单个会话详情：文件树与 Skill / MCP 记录。 |
-| `POST` | `/sessions/delete` | `{ sessionId, confirm }` | `confirm` 必须精确等于 `DELETE SESSION <sessionId>`。 |
-| `POST` | `/files/delete` | `{ sessionId, paths[], confirm }` | `confirm` 必须精确等于 `DELETE FILES <sessionId>`。 |
+| `GET` | `/session` | `?sessionId=` | 单会话详情：文件树 + Skill / MCP 记录。 |
+| `GET` | `/workspaces` | — | 当前已打开的 DSH 工作区列表。 |
+| `GET` | `/trash` | — | 回收区条目（含文件树、`restorable`、所属会话）。 |
+| `POST` | `/sessions/delete` | `{ sessionId, confirm }` | 确认串 `DELETE SESSION <sessionId>`；连带子会话与现存文件移入回收区。 |
+| `POST` | `/sessions/stop` | `{ sessionId, confirm }` | 确认串 `STOP SESSION <sessionId>`；停止该会话树中的活动会话。 |
+| `POST` | `/sessions/pin` | `{ sessionId, pinned }` | 收藏 / 取消收藏。 |
+| `POST` | `/sessions/assign-workspace` | `{ sessionId, workspaceId }` | 归入工作区（先 attach 再 detach 原工作区）。 |
+| `POST` | `/sessions/unassign-workspace` | `{ sessionId }` | 改为未分组。 |
+| `POST` | `/files/delete` | `{ sessionId, paths[], confirm }` | 确认串 `DELETE FILES <sessionId>`；现存条目入回收区，缺失条目仅隐藏。 |
 | `POST` | `/files/reveal` | `{ sessionId, path }` | 在资源管理器中定位（仅 Windows）。 |
 | `POST` | `/trash/reveal` | `{}` | 打开回收区目录（仅 Windows）。 |
-| `GET` | `/trash` | — | 读取插件回收区的可恢复条目。 |
-| `POST` | `/trash/restore` | `{ id, confirm }` | 恢复条目；恢复会话后提示重启 DSH 以重建侧边栏索引。 |
-| `POST` | `/trash/permanently-delete` | `{ id, confirm }` | 永久删除回收区条目；不可恢复。 |
-| `POST` | `/desktop/restart` | `{}` | 请求 DSH Desktop 立即重启；仅 Desktop Electron 宿主可用。 |
-| `POST` | `/sessions/pin` | `{ sessionId, pinned }` | 收藏 / 取消收藏。 |
+| `POST` | `/trash/reveal-entry` | `{ id }` | 在资源管理器中定位回收区条目（仅 Windows）。 |
+| `POST` | `/trash/restore` | `{ id, confirm }` | 确认串 `RESTORE <entry-id>`；原路径被占用则拒绝。 |
+| `POST` | `/trash/permanently-delete` | `{ id, confirm }` | 确认串 `PURGE <entry-id>`；不可撤销。 |
+| `POST` | `/trash/permanently-delete-batch` | `{ ids[], confirm }` | 确认串 `PURGE <count> ITEMS`，一次最多 200 条。 |
+| `POST` | `/desktop/restart` | `{}` | 请求 DSH Desktop 立即重启（仅 Electron 宿主可用）。 |
 
-业务校验失败统一返回 `400 {"error":"…"}`，未知路径返回 `404`。删除会话成功后返回
-`restartRequired: true` —— 建议重启 DSH，让侧边栏索引与磁盘状态对齐。
+会话删除成功返回 `restartRequired: true`；回收区恢复会话同样返回 `restartRequired: true` —— 重启后
+DSH 才会重建侧边栏索引。
 
 ## 磁盘布局
 
@@ -209,12 +241,13 @@ dsh plugin --profile desktop add file:./dsh-session-manage-0.5.4.tgz
 │  ├─ session_projcache/sessions/<session-id>.json           # 侧边栏标题 / 投影（只读）
 │  └─ session-manager-context.json                           # 本插件索引（version 4）
 └─ trash/session-manager/
-   ├─ audit.jsonl                                            # 审计日志
-   └─ <ISO 时间戳>/files-<session-id>/<name>-<sha256:12>     # 被移动的文件 / 目录
-      <ISO 时间戳>/sessions-<session-id>/<…>                 # 被移动的会话日志目录
+   ├─ audit.jsonl                                            # 审计日志（回收区视图的数据源）
+   └─ <ISO 时间戳>/
+      ├─ files-<session-id>/<name>-<sha256:12>               # 被移入的文件 / 目录
+      └─ sessions-<session-id>/<…>                           # 被移入的会话日志目录
 ```
 
-`session-manager-context.json` 保存运行期观察到的文件条目、Skill / MCP 记录、被隐藏的历史条目与收藏列表；
+`session-manager-context.json` 持久化运行期观察到的文件条目、Skill / MCP 记录、被隐藏的历史条目与收藏列表；
 写入采用「临时文件 + rename」，进程被杀不会留下半截索引。
 
 ## CLI
@@ -223,19 +256,19 @@ dsh plugin --profile desktop add file:./dsh-session-manage-0.5.4.tgz
 dsh-session-manage list
 ```
 
-输出每行一个 JSON（`sessionId`、`createdAt`、`cwd`、`logPath`、`uploads`）。
-破坏性操作**只**通过 DSH 界面提供，且必须携带显式确认串。
+每行输出一个 JSON（`sessionId`、`createdAt`、`cwd`、`logPath`、`uploads`）。
+破坏性操作**只**通过 DSH 界面或 HTTP API 提供，且必须携带显式确认串。
 
 ## 已知限制
 
-- **跨卷移动**：源文件与回收区位于不同盘符时，插件会先完整复制到回收区，成功后才删除源文件；可用空间不足会使操作失败且保留源文件。
-- **`deletable` 不拦截勾选**：证据等级目前只参与计数与展示，勾选范围是本会话扫描到的现存条目。请按「来源」「作用」列人工确认后再处置。
-- **平台**：资源管理器定位 / 打开回收区仅 Windows；其他平台这两个入口会返回错误。
-- **Skill / MCP 记录**：只在插件运行期间从会话事件采集；历史会话若没留下事件，无法回溯，插件不会猜测。
-- **扫描上限**：单会话最多 250 个文件条目（超出静默截断）；日志压缩体上限 32 MiB、解码后 96 MiB，超限的会话在列表里显示为无效行。
-- **投影路径识别**：从投影文本抽取绝对路径时只识别 Windows 风格 `X:\…`，非 Windows 工作区在投影来源上可能漏项。
-- **无一键还原**：回收区、带哈希的目标名与审计日志都已就位，但还原需要按 `audit.jsonl` 手工移回。
-- **会话删除不清理投影缓存**：`session_projcache` 中的条目需自行清理。
+- **`deletable` 不拦截勾选**：证据等级目前只参与计数与展示；勾选范围是本会话扫描到的现存条目，请人工确认来源后再处置。
+- **平台**：资源管理器定位 / 打开回收区仅 Windows；其他平台会返回明确错误。
+- **重启依赖**：恢复或删除会话后，侧边栏要等 DSH 重启才刷新；`/desktop/restart` 仅在 Electron Desktop 宿主可用，Web/CLI 宿主需手动重启。
+- **Skill / MCP 记录**：只在插件运行期间从会话事件采集；历史会话若没留下事件就无法回溯，插件不做推测。
+- **扫描上限**：单会话最多 250 个文件条目（超出静默截断）；日志压缩体上限 32 MiB、解码后 96 MiB，超限会话在列表里显示为错误行。
+- **投影路径识别**：从投影文本抽取路径只识别 Windows 风格 `X:\…`，非 Windows 工作区在投影来源上可能漏项。
+- **会话删除不清理投影缓存**：`session_projcache` 中的对应条目需自行清理。
+- **回收区依赖审计**：条目来自 `audit.jsonl`；手工删除审计行会让对应条目失去管理入口。
 
 ## 开发
 
@@ -245,21 +278,22 @@ npm test         # node --test test/*.test.js
 npm pack
 ```
 
-测试覆盖的行为（`test/validation.test.js`）：
+测试覆盖（`test/validation.test.js`）：
 
-1. 上传文件可删，普通工作区引用不可删；
-2. 委派子会话不出现在主列表，但计入主会话绑定数量；
-3. 标题优先取侧边栏投影；
-4. 投影里带创建声明的路径被识别为会话产物，且同一行多个路径都能解析；
-5. 无创建声明的投影引用可见但不可删。
+1. `isInside` 拒绝不同盘符的路径（Windows 跨卷边界）；
+2. 上传附件可删，普通工作区引用不可删；
+3. 委派子会话不出现在主列表，但计入主会话的绑定数量；
+4. 标题优先取侧边栏投影；
+5. 投影中带创建声明的路径被识别为会话产物；
+6. 无创建声明的投影引用可见但不可删。
 
 ### 项目结构
 
 ```text
 dsh-session-manage/
 ├─ lib/
-│  ├─ index.js               # 宿主插件：会话索引、文件扫描、删除边界、HTTP API
-│  └─ client.js              # 设置页 UI（经 __ModuleLoader__ 注入，无构建步骤）
+│  ├─ index.js               # 宿主插件：会话索引、文件扫描、处置边界、回收区、HTTP API
+│  └─ client.js              # 设置页 UI（模块加载器注入，无构建步骤）
 ├─ bin/
 │  └─ dsh-session-manager.js # CLI 入口
 ├─ test/
@@ -268,8 +302,9 @@ dsh-session-manage/
 └─ package.json
 ```
 
-宿主侧依赖三项服务：`webServer`（注册 API 前缀）、`sessions`（活跃会话判定、归档侧边栏引用）、
-`workspaceRegistry`。客户端只依赖 `slots` 与 `locale`。
+宿主侧依赖三项服务：`webServer`（注册 API 前缀）、`sessions`（活跃会话判定）、`workspaceRegistry`
+（归档 / 反归档会话、工作区归属）。客户端只依赖 `slots` 与 `locale`。
+`isInside` 与 `listSessions` 对外导出，供 CLI 与测试复用。
 
 ## 发布
 
@@ -277,24 +312,9 @@ dsh-session-manage/
 2. `npm run check && npm test`；
 3. `npm pack` 生成 `dsh-session-manage-<version>.tgz`；
 4. 提交源码并打同名 tag（`git tag vX.Y.Z && git push --tags`）；
-5. 在 GitHub Release 选择该 tag，上传生成的 `.tgz`，写明变更与兼容性。
+5. 在 GitHub Release 选择该 tag，上传 `.tgz`，写明变更与兼容性。
 
 仓库只提交源码与文档；`node_modules/`、`.npm-cache/`、`*.tgz` 已在 `.gitignore` 中排除。
-
-## 回收区与收藏区
-
-### 可视化回收区
-
-会话列表顶部的 **♻ 回收区** 会打开插件内的回收区视图。会话作为根节点，显示会话 ID、名称、创建时间；其下以可展开文件树展示该会话移入回收区的文件和目录。
-
-- **恢复原位置**：恢复前检查原路径是否已存在，绝不覆盖已有文件或目录。
-- **恢复会话**：恢复会话日志目录后，会调用 DSH `workspaceRegistry.unarchiveSession()` 并提示重启；重启后由 DSH 重新读取索引，在侧边栏恢复会话。
-- **永久删除**：需要两次确认；文件或目录会从 DSH 回收区物理删除，无法撤销。
-- **保护范围**：操作只接受回收区审计记录中的路径，拒绝任何回收区外路径。
-
-### 收藏区
-
-会话列表顶部的 **★ 收藏** 打开独立分类，只显示已收藏的主会话。可在该分类中直接进入会话，或通过会话右键菜单取消收藏。
 
 ## License
 
@@ -302,18 +322,24 @@ dsh-session-manage/
 
 ## English
 
-`dsh-session-manage` is a plugin for **DSH (DeepSeek Harness) Desktop** that adds a
-*Sessions* panel under Settings.
+`dsh-session-manage` adds a **Sessions** panel under Settings in **DSH (DeepSeek Harness)**,
+turning "which files did this conversation produce?" into an answerable question and making every
+destructive action recoverable.
 
-- Lists primary sessions with sidebar-consistent titles, workspace, log size and bound subagent count;
-  delegated subagent sessions are folded into their parent instead of cluttering the list.
-- Scans file references only for the session you open — from the zstd session log, the durable
-  projection cache, and live events — and renders them as an expandable tree.
-- Every destructive action is a **move into a DSH-managed trash directory** with an appended
-  `audit.jsonl` record; the workspace root, `DSH_HOME`, and paths used by other running sessions are refused.
-- Records Skill / MCP usage observed during the plugin's lifetime.
-- Host API is served by DSH's own loopback webserver (`/api/dsh-session-manage`), 512 KiB JSON bodies,
-  exact-action confirmation tokens. No network egress, no model calls, no token usage.
+- Lists primary sessions with sidebar-consistent titles, workspace, log size, pinned state and bound
+  subagent count; delegated subagent sessions are folded into their parent instead of cluttering the list.
+- File and context scans run only for the session you open — from the zstd session log, the durable
+  projection cache, and live events — and render as an expandable tree with per-entry provenance.
+- Every destructive action moves data into a DSH-managed trash directory and appends an `audit.jsonl`
+  record. The workspace root, `DSH_HOME`, session stores outside `sessionsRoot`, and running sessions are
+  refused; cross-volume moves copy first and delete only after a successful copy.
+- A visual trash view rebuilds itself from the audit log: restore to the original path (never
+  overwriting), restore whole sessions back into the sidebar, or permanently delete single or bulk entries.
+- Sessions can be stopped, pinned, re-assigned to another open workspace, or moved to "Unassigned".
+- Records Skill / MCP usage observed while the plugin runs.
+- Host API is served by DSH's own loopback webserver (`/api/dsh-session-manage`, 512 KiB JSON bodies,
+  exact-action confirmation tokens). No network egress, no model calls, no token usage.
+
 Requirements: DSH Host WebServer `>=0.2.1-rc.1 <0.2.2-0`, Cordis `~4.0.5`, Node.js `>=22.15`
-(dev/packaging only). Explorer integration is Windows-only, and the trash directory must live on the
-same volume as the files it receives. UI strings are Simplified Chinese.
+(development/packaging only). Explorer integration is Windows-only; a DSH restart is required after
+restoring or deleting sessions so the sidebar index matches disk. UI strings are Simplified Chinese.
