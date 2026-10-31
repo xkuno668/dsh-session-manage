@@ -6,7 +6,7 @@
 
 在 DSH 设置左侧栏集中查看主会话、会话关联文件、Skill / MCP 使用记录，并以「可审计、可恢复」的方式处理会话及其产物文件。
 
-![version](https://img.shields.io/badge/version-0.3.9-4f46e5)
+![version](https://img.shields.io/badge/version-0.5.4-4f46e5)
 ![node](https://img.shields.io/badge/node-%3E%3D22.15-339933)
 ![platform](https://img.shields.io/badge/platform-DSH%20Desktop%20%C2%B7%20Web-0ea5e9)
 ![license](https://img.shields.io/badge/license-MIT-111827)
@@ -82,7 +82,7 @@ DSH 本身不提供「这个会话动了哪些文件」的视图。`dsh-session-
 `dsh-session-manage-<version>.tgz`，然后：
 
 ```bash
-dsh plugin --profile desktop add file:./dsh-session-manage-0.3.9.tgz
+dsh plugin --profile desktop add file:./dsh-session-manage-0.5.4.tgz
 ```
 
 ### 方式二：从源码构建安装
@@ -95,7 +95,7 @@ npm run check    # 语法检查：宿主 / 客户端 / CLI
 npm test         # 回归测试
 npm pack         # 生成 dsh-session-manage-<version>.tgz
 
-dsh plugin --profile desktop add file:./dsh-session-manage-0.3.9.tgz
+dsh plugin --profile desktop add file:./dsh-session-manage-0.5.4.tgz
 ```
 
 安装完成后**完全退出并重新启动 DSH**（宿主插件与客户端 bundle 都在启动期装载），再打开
@@ -191,6 +191,10 @@ dsh plugin --profile desktop add file:./dsh-session-manage-0.3.9.tgz
 | `POST` | `/files/delete` | `{ sessionId, paths[], confirm }` | `confirm` 必须精确等于 `DELETE FILES <sessionId>`。 |
 | `POST` | `/files/reveal` | `{ sessionId, path }` | 在资源管理器中定位（仅 Windows）。 |
 | `POST` | `/trash/reveal` | `{}` | 打开回收区目录（仅 Windows）。 |
+| `GET` | `/trash` | — | 读取插件回收区的可恢复条目。 |
+| `POST` | `/trash/restore` | `{ id, confirm }` | 恢复条目；恢复会话后提示重启 DSH 以重建侧边栏索引。 |
+| `POST` | `/trash/permanently-delete` | `{ id, confirm }` | 永久删除回收区条目；不可恢复。 |
+| `POST` | `/desktop/restart` | `{}` | 请求 DSH Desktop 立即重启；仅 Desktop Electron 宿主可用。 |
 | `POST` | `/sessions/pin` | `{ sessionId, pinned }` | 收藏 / 取消收藏。 |
 
 业务校验失败统一返回 `400 {"error":"…"}`，未知路径返回 `404`。删除会话成功后返回
@@ -224,7 +228,7 @@ dsh-session-manage list
 
 ## 已知限制
 
-- **同卷限制**：回收区与源文件必须位于同一磁盘卷，跨卷移动会失败（`EXDEV`）。若 `DSH_HOME` 与工作区不在同一盘，请在配置里把 `trashDirectory` 指到工作区所在卷。
+- **跨卷移动**：源文件与回收区位于不同盘符时，插件会先完整复制到回收区，成功后才删除源文件；可用空间不足会使操作失败且保留源文件。
 - **`deletable` 不拦截勾选**：证据等级目前只参与计数与展示，勾选范围是本会话扫描到的现存条目。请按「来源」「作用」列人工确认后再处置。
 - **平台**：资源管理器定位 / 打开回收区仅 Windows；其他平台这两个入口会返回错误。
 - **Skill / MCP 记录**：只在插件运行期间从会话事件采集；历史会话若没留下事件，无法回溯，插件不会猜测。
@@ -277,6 +281,21 @@ dsh-session-manage/
 
 仓库只提交源码与文档；`node_modules/`、`.npm-cache/`、`*.tgz` 已在 `.gitignore` 中排除。
 
+## 回收区与收藏区
+
+### 可视化回收区
+
+会话列表顶部的 **♻ 回收区** 会打开插件内的回收区视图。会话作为根节点，显示会话 ID、名称、创建时间；其下以可展开文件树展示该会话移入回收区的文件和目录。
+
+- **恢复原位置**：恢复前检查原路径是否已存在，绝不覆盖已有文件或目录。
+- **恢复会话**：恢复会话日志目录后，会调用 DSH `workspaceRegistry.unarchiveSession()` 并提示重启；重启后由 DSH 重新读取索引，在侧边栏恢复会话。
+- **永久删除**：需要两次确认；文件或目录会从 DSH 回收区物理删除，无法撤销。
+- **保护范围**：操作只接受回收区审计记录中的路径，拒绝任何回收区外路径。
+
+### 收藏区
+
+会话列表顶部的 **★ 收藏** 打开独立分类，只显示已收藏的主会话。可在该分类中直接进入会话，或通过会话右键菜单取消收藏。
+
 ## License
 
 [MIT](LICENSE)
@@ -295,7 +314,6 @@ dsh-session-manage/
 - Records Skill / MCP usage observed during the plugin's lifetime.
 - Host API is served by DSH's own loopback webserver (`/api/dsh-session-manage`), 512 KiB JSON bodies,
   exact-action confirmation tokens. No network egress, no model calls, no token usage.
-
 Requirements: DSH Host WebServer `>=0.2.1-rc.1 <0.2.2-0`, Cordis `~4.0.5`, Node.js `>=22.15`
 (dev/packaging only). Explorer integration is Windows-only, and the trash directory must live on the
 same volume as the files it receives. UI strings are Simplified Chinese.

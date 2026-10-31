@@ -5,9 +5,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { zstdCompress } from "node:zlib";
-import { listSessions } from "../lib/index.js";
+import { isInside, listSessions } from "../lib/index.js";
 
 const compress = promisify(zstdCompress);
+
+test("isInside rejects Windows paths on a different drive", () => {
+  assert.equal(isInside("E:\\work\\output.txt", "C:\\Users\\Xkuno\\.dsh"), false);
+  assert.equal(isInside("C:\\Users\\Xkuno\\.dsh\\sessions\\one", "C:\\Users\\Xkuno\\.dsh"), true);
+});
 
 test("listSessions reports upload files but does not make ordinary workspace references deletable", async () => {
   const root = await mkdtemp(join(tmpdir(), "dsh-session-manager-"));
