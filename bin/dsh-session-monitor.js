@@ -7,7 +7,7 @@ const [command = "list", ...rest] = process.argv.slice(2);
 const dshHome = resolve(process.env.DSH_HOME ?? join(homedir(), ".dsh"));
 
 if (command !== "list" || rest.length > 0) {
-  console.error("Usage: dsh-session-manage list");
+  console.error("Usage: dsh-session-monitor list");
   console.error("Destructive operations are intentionally available only through the DSH UI, where explicit confirmation is required.");
   process.exitCode = 2;
 } else {

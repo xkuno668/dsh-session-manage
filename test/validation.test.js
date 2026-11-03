@@ -15,7 +15,7 @@ test("isInside rejects Windows paths on a different drive", () => {
 });
 
 test("listSessions reports upload files but does not make ordinary workspace references deletable", async () => {
-  const root = await mkdtemp(join(tmpdir(), "dsh-session-manager-"));
+  const root = await mkdtemp(join(tmpdir(), "dsh-session-monitor-"));
   const cwd = join(root, "workspace");
   const sessionDir = join(root, "sessions", "workspace", "abc");
   await mkdir(join(cwd, ".dsh-uploads"), { recursive: true });
@@ -36,7 +36,7 @@ test("listSessions reports upload files but does not make ordinary workspace ref
 });
 
 test("listSessions hides delegated subagent sessions and counts them for their primary session", async () => {
-  const root = await mkdtemp(join(tmpdir(), "dsh-session-manager-"));
+  const root = await mkdtemp(join(tmpdir(), "dsh-session-monitor-"));
   const sessions = join(root, "sessions", "workspace");
   const writeSession = async (directory, header) => {
     await mkdir(join(sessions, directory), { recursive: true });
@@ -55,7 +55,7 @@ test("listSessions hides delegated subagent sessions and counts them for their p
 });
 
 test("listSessions uses the same title projection as the Desktop sidebar", async () => {
-  const root = await mkdtemp(join(tmpdir(), "dsh-session-manager-"));
+  const root = await mkdtemp(join(tmpdir(), "dsh-session-monitor-"));
   const sessionRoot = join(root, "sessions", "workspace", "primary");
   const titleRoot = join(root, "storages", "session_projcache", "sessions");
   await mkdir(sessionRoot, { recursive: true });
@@ -68,7 +68,7 @@ test("listSessions uses the same title projection as the Desktop sidebar", async
 });
 
 test("listSessions finds workspace-local paths in the durable session projection", async () => {
-  const root = await mkdtemp(join(tmpdir(), "dsh-session-manager-"));
+  const root = await mkdtemp(join(tmpdir(), "dsh-session-monitor-"));
   const workspace = join(root, "workspace");
   const sessionRoot = join(root, "sessions", "workspace", "primary");
   const titleRoot = join(root, "storages", "session_projcache", "sessions");
@@ -90,7 +90,7 @@ test("listSessions finds workspace-local paths in the durable session projection
 });
 
 test("projection references without a creation claim remain visible but cannot be deleted", async () => {
-  const root = await mkdtemp(join(tmpdir(), "dsh-session-manager-"));
+  const root = await mkdtemp(join(tmpdir(), "dsh-session-monitor-"));
   const workspace = join(root, "workspace");
   const sessionRoot = join(root, "sessions", "workspace", "primary");
   const titleRoot = join(root, "storages", "session_projcache", "sessions");

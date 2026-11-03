@@ -1,30 +1,31 @@
 {
-  "name": "dsh-session-manage",
-  "version": "0.5.4",
-  "description": "Auditable, recoverable session and upload-file management for DeepSeek Harness.",
+  "name": "dsh-session-monitor",
+  "version": "0.6.0",
+  "description": "Auditable, recoverable session monitoring and file management for DeepSeek Harness.",
   "license": "MIT",
   "author": "xkuno668",
   "type": "module",
-  "homepage": "https://github.com/xkuno668/dsh-session-manage#readme",
+  "homepage": "https://github.com/xkuno668/dsh-session-monitor#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/xkuno668/dsh-session-manage.git"
+    "url": "git+https://github.com/xkuno668/dsh-session-monitor.git"
   },
   "bugs": {
-    "url": "https://github.com/xkuno668/dsh-session-manage/issues"
+    "url": "https://github.com/xkuno668/dsh-session-monitor/issues"
   },
   "keywords": [
     "dsh",
     "deepseek-harness",
     "cordis",
     "plugin",
+    "session-monitor",
     "session-manager",
     "trash",
     "audit"
   ],
   "main": "./lib/index.js",
   "bin": {
-    "dsh-session-manage": "./bin/dsh-session-manager.js"
+    "dsh-session-monitor": "./bin/dsh-session-monitor.js"
   },
   "exports": {
     ".": "./lib/index.js",
@@ -50,7 +51,7 @@
     "react": "^18.2.0"
   },
   "scripts": {
-    "check": "node --check lib/index.js && node --check lib/client.js && node --check bin/dsh-session-manager.js",
+    "check": "node --check lib/index.js && node --check lib/client.js && node --check bin/dsh-session-monitor.js",
     "test": "node --test test/*.test.js"
   }
 }

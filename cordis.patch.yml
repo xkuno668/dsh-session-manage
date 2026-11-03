@@ -1,11 +1,12 @@
 # Adds a host API and a per-conversation management view.  dshHomePath keeps
 # the package portable across Windows, macOS, Linux and custom DSH_HOME roots.
 - insert:
-    - id: session-manage
-      name: dsh-session-manage
+    - id: session-monitor
+      name: dsh-session-monitor
       config:
         dshHome: !!js dshHomePath()
+        # Keep the legacy storage path so existing trash remains accessible.
         trashDirectory: !!js dshHomePath('trash', 'session-manager')
 
-    - id: ui-session-manage
-      name: dsh-session-manage/client
+    - id: ui-session-monitor
+      name: dsh-session-monitor/client
