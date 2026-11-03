@@ -1,12 +1,12 @@
 <div align="center">
 
-# dsh-session-manage
+# dsh-session-monitor
 
-**DSH（DeepSeek Harness）的会话、产物文件与回收区管理插件**
+**DSH（DeepSeek Harness）的会话监控、产物文件与回收区管理插件**
 
 在「设置 → 会话管理」里按会话查看日志、关联文件与 Skill / MCP 使用记录，并把处置动作收敛成「移入回收区 + 写审计 + 可恢复」。
 
-![version](https://img.shields.io/badge/version-0.5.4-4f46e5)
+![version](https://img.shields.io/badge/version-0.6.0-4f46e5)
 ![node](https://img.shields.io/badge/node-%3E%3D22.15-339933)
 ![platform](https://img.shields.io/badge/platform-DSH%20Desktop%20%C2%B7%20Web-0ea5e9)
 ![license](https://img.shields.io/badge/license-MIT-111827)
@@ -41,7 +41,7 @@ DSH 把每个会话写成 `<DSH_HOME>/sessions/<workspace>/<session-id>/session.
 这些文件只增不减：会话日志、被会话读过或写过的产物、历史上的删除记录都会一直留在磁盘上，而 DSH 本身不提供
 「这个会话动了哪些文件」的视图。
 
-`dsh-session-manage` 补上这一层：
+`dsh-session-monitor` 补上这一层：
 
 - 以**会话**而不是**目录**为单位回答「谁产生了这些文件」；
 - 处置动作统一走「移入 DSH 回收区 + 写审计 + 可恢复」，而不是不可逆的擦除；
@@ -84,28 +84,38 @@ DSH 把每个会话写成 `<DSH_HOME>/sessions/<workspace>/<session-id>/session.
 
 ### 方式一：安装 Release 里的插件包
 
-从 [Releases](https://github.com/xkuno668/dsh-session-manage/releases) 下载
-`dsh-session-manage-<version>.tgz`，然后：
+从 [Releases](https://github.com/xkuno668/dsh-session-monitor/releases) 下载
+`dsh-session-monitor-<version>.tgz`，然后：
 
 ```bash
-dsh plugin --profile desktop add file:./dsh-session-manage-0.5.4.tgz
+dsh plugin --profile desktop add file:./dsh-session-monitor-0.6.0.tgz
 ```
 
 ### 方式二：从源码构建安装
 
 ```bash
-git clone https://github.com/xkuno668/dsh-session-manage.git
-cd dsh-session-manage
+git clone https://github.com/xkuno668/dsh-session-monitor.git
+cd dsh-session-monitor
 
 npm run check    # 语法检查：宿主 / 客户端 / CLI
 npm test         # 回归测试
-npm pack         # 生成 dsh-session-manage-<version>.tgz
+npm pack         # 生成 dsh-session-monitor-<version>.tgz
 
-dsh plugin --profile desktop add file:./dsh-session-manage-0.5.4.tgz
+dsh plugin --profile desktop add file:./dsh-session-monitor-0.6.0.tgz
 ```
 
 安装完成后**完全退出并重启 DSH**（宿主插件与客户端 bundle 都在启动期装载），再打开
 `设置 → 会话管理`。Profile 名按实际环境替换，例如 `desktop` / `web`。
+
+### 从 dsh-session-manage 升级
+
+`0.6.0` 起包名由 `dsh-session-manage` 改为 `dsh-session-monitor`（插件 id 同步为 `session-monitor` /
+`ui-session-monitor`，API 前缀改为 `/api/dsh-session-monitor`）。升级步骤：
+
+1. 先移除旧包：`dsh plugin --profile desktop remove dsh-session-manage`；
+2. 按上面的方式安装 `dsh-session-monitor`；
+3. 重启 DSH。DSH 的回收区与索引文件**沿用旧的磁盘路径**（见[磁盘布局](#磁盘布局)），
+   已有的审计记录、回收区条目与收藏列表继续可用，不需要迁移。
 
 ## 使用
 
@@ -193,19 +203,19 @@ dsh plugin --profile desktop add file:./dsh-session-manage-0.5.4.tgz
 ```yaml
 # cordis.patch.yml
 - insert:
-    - id: session-manage
-      name: dsh-session-manage
+    - id: session-monitor
+      name: dsh-session-monitor
       config:
         dshHome: !!js dshHomePath()
         trashDirectory: !!js dshHomePath('trash', 'session-manager')
 
-    - id: ui-session-manage
-      name: dsh-session-manage/client
+    - id: ui-session-monitor
+      name: dsh-session-monitor/client
 ```
 
 ## HTTP API
 
-服务挂载在 DSH 自身的 loopback WebServer 上，前缀 `/api/dsh-session-manage`（不额外开监听端口）。
+服务挂载在 DSH 自身的 loopback WebServer 上，前缀 `/api/dsh-session-monitor`（不额外开监听端口）。
 请求体上限 512 KiB；业务校验失败统一 `400 {"error":"…"}`，未知路径 `404`；响应 `cache-control: no-store`。
 所有破坏性操作都要求 `confirm` 字段与动作串**完全相等**。
 
@@ -250,10 +260,15 @@ DSH 才会重建侧边栏索引。
 `session-manager-context.json` 持久化运行期观察到的文件条目、Skill / MCP 记录、被隐藏的历史条目与收藏列表；
 写入采用「临时文件 + rename」，进程被杀不会留下半截索引。
 
+> [!NOTE]
+> 包名改为 `dsh-session-monitor` 后，**磁盘路径保持历史命名**（`trash/session-manager`、
+> `session-manager-context.json`）——这是刻意的兼容决定：改名不会让已有的回收区、审计日志与收藏列表失效。
+> 需要换名时请自行迁移并同步 `trashDirectory` 配置。
+
 ## CLI
 
 ```bash
-dsh-session-manage list
+dsh-session-monitor list
 ```
 
 每行输出一个 JSON（`sessionId`、`createdAt`、`cwd`、`logPath`、`uploads`）。
@@ -273,7 +288,7 @@ dsh-session-manage list
 ## 开发
 
 ```bash
-npm run check    # node --check：lib/index.js、lib/client.js、bin/dsh-session-manager.js
+npm run check    # node --check：lib/index.js、lib/client.js、bin/dsh-session-monitor.js
 npm test         # node --test test/*.test.js
 npm pack
 ```
@@ -290,12 +305,12 @@ npm pack
 ### 项目结构
 
 ```text
-dsh-session-manage/
+dsh-session-monitor/
 ├─ lib/
 │  ├─ index.js               # 宿主插件：会话索引、文件扫描、处置边界、回收区、HTTP API
 │  └─ client.js              # 设置页 UI（模块加载器注入，无构建步骤）
 ├─ bin/
-│  └─ dsh-session-manager.js # CLI 入口
+│  └─ dsh-session-monitor.js # CLI 入口
 ├─ test/
 │  └─ validation.test.js     # 回归测试
 ├─ cordis.patch.yml          # Cordis / DSH 注入声明
@@ -310,7 +325,7 @@ dsh-session-manage/
 
 1. 调整 `package.json` 版本号；
 2. `npm run check && npm test`；
-3. `npm pack` 生成 `dsh-session-manage-<version>.tgz`；
+3. `npm pack` 生成 `dsh-session-monitor-<version>.tgz`；
 4. 提交源码并打同名 tag（`git tag vX.Y.Z && git push --tags`）；
 5. 在 GitHub Release 选择该 tag，上传 `.tgz`，写明变更与兼容性。
 
@@ -322,7 +337,7 @@ dsh-session-manage/
 
 ## English
 
-`dsh-session-manage` adds a **Sessions** panel under Settings in **DSH (DeepSeek Harness)**,
+`dsh-session-monitor` adds a **Sessions** panel under Settings in **DSH (DeepSeek Harness)**,
 turning "which files did this conversation produce?" into an answerable question and making every
 destructive action recoverable.
 
@@ -337,7 +352,7 @@ destructive action recoverable.
   overwriting), restore whole sessions back into the sidebar, or permanently delete single or bulk entries.
 - Sessions can be stopped, pinned, re-assigned to another open workspace, or moved to "Unassigned".
 - Records Skill / MCP usage observed while the plugin runs.
-- Host API is served by DSH's own loopback webserver (`/api/dsh-session-manage`, 512 KiB JSON bodies,
+- Host API is served by DSH's own loopback webserver (`/api/dsh-session-monitor`, 512 KiB JSON bodies,
   exact-action confirmation tokens). No network egress, no model calls, no token usage.
 
 Requirements: DSH Host WebServer `>=0.2.1-rc.1 <0.2.2-0`, Cordis `~4.0.5`, Node.js `>=22.15`
